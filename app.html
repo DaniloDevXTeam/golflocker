@@ -1,0 +1,1402 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#297900">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Golf Locker POS</title>
+
+  <link rel="manifest" href="?file=manifest">
+  <link rel="apple-touch-icon" href="https://shop.golf-locker.nl/wp-content/uploads/2024/04/Golf-Locker-Logo-1-scaled.png">
+  <script src="https://unpkg.com/@zxing/library@0.20.0"></script>
+
+  <style>
+    :root{
+      --accent:#297900; --accent-dark:#1f5f00; --accent-light:#f0f9ee;
+      --danger:#e11d48; --border:#d1d5db; --text:#1f2937; --muted:#6b7280;
+      --bg:#f8fafc; --panel:#ffffff;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
+      background:var(--bg);
+      color:var(--text);
+    }
+
+    /* ===== DESKTOP (default) ===== */
+    .appbar{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      padding:10px 16px;
+      background:#fff;
+      border-bottom:2px solid var(--accent);
+      position:sticky;
+      top:0;
+      z-index:50;
+    }
+    .brand{display:flex;align-items:center;gap:10px}
+    .brand img{height:40px;width:auto;display:block}
+    .brand h1{font-size:18px;margin:0;font-weight:600;color:var(--accent)}
+    .actions{display:flex;gap:8px}
+    .btn{
+      font-size:15px;
+      padding:10px 14px;
+      border-radius:8px;
+      border:1px solid var(--border);
+      background:#fff;
+      color:var(--text);
+      cursor:pointer;
+      transition:.15s background;
+    }
+    .btn:hover{background:#f3f4f6}
+    .btn-danger{color:var(--danger);border-color:var(--danger);background:#fff}
+    .btn-primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+    .btn-primary:hover{background:var(--accent-dark)}
+    .btn-ghost{background:#fff}
+
+    .wrap{
+      max-width:1200px;
+      margin:0 auto;
+      padding:16px;
+      padding-bottom:calc(var(--footer-h,160px) + 16px);
+    }
+
+    .panel{
+      background:var(--panel);
+      border:1px solid var(--border);
+      border-radius:10px;
+      padding:12px 14px;
+      box-shadow:0 2px 4px rgba(0,0,0,.05);
+    }
+
+    .scanbar{display:flex;gap:10px;align-items:center}
+    .pill{
+      flex:1;
+      font-size:18px;
+      padding:10px 14px;
+      border-radius:8px;
+      border:1px solid var(--border);
+      background:#fff;
+      color:var(--text);
+    }
+    .pill::placeholder{color:var(--muted)}
+    .btn-scan{background:var(--accent);border-color:var(--accent);color:#fff}
+    .btn-cam{background:#e5e7eb;color:var(--text)}
+
+    table{width:100%;border-collapse:collapse;margin-top:6px}
+    th,td{border-bottom:1px solid var(--border);padding:10px}
+    th{background:var(--accent-light);text-align:left;color:var(--text)}
+    td input[type="number"]{
+      width:100px;
+      font-size:16px;
+      padding:6px 8px;
+      background:#fff;
+      color:var(--text);
+      border:1px solid var(--border);
+      border-radius:6px;
+    }
+    .right{text-align:right}
+    .center{text-align:center}
+
+    .footer{
+      position:fixed;
+      left:0;right:0;bottom:0;
+      z-index:100;
+      background:#fff;
+      border-top:2px solid var(--accent);
+      box-shadow:0 -3px 6px rgba(0,0,0,.10);
+      padding:10px 14px;
+      padding-bottom:calc(10px + env(safe-area-inset-bottom));
+    }
+    .footer-inner{
+      max-width:1200px;
+      margin:0 auto;
+      display:flex;
+      flex-direction:row;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:20px;
+      flex-wrap:wrap;
+    }
+    .footer-left{flex:1;min-width:220px}
+    .footer-right{flex:1.2;min-width:260px}
+    .footer-right select,
+    .footer-right input.email{width:100%;margin-bottom:8px}
+    .footer-right .btn-primary{width:100%;padding:14px;font-size:18px}
+
+    .paybox label{display:block;font-size:13px;color:var(--muted);margin-bottom:4px}
+    select,.email{
+      width:100%;
+      font-size:16px;
+      padding:10px 12px;
+      border-radius:8px;
+      border:1px solid var(--border);
+      background:#fff;
+      color:var(--text);
+    }
+    .total-big{font-size:30px;font-weight:700;color:var(--accent)}
+    .item-count{font-size:12px;color:var(--muted);margin-top:2px}
+    .cta .btn-primary{font-size:18px;padding:14px 16px;border-radius:10px}
+    .muted{color:var(--muted);font-size:12px}
+    #spinner{
+      position:fixed;
+      inset:0;
+      background:rgba(255,255,255,.6);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      z-index:80;
+    }
+    #spinner>div{
+      background:#fff;
+      border:1px solid var(--border);
+      padding:14px 18px;
+      border-radius:10px;
+      color:var(--text);
+    }
+    #toast{
+      position:fixed;
+      bottom:16px;
+      left:50%;
+      transform:translateX(-50%);
+      background:var(--accent);
+      color:#fff;
+      padding:8px 12px;
+      border-radius:8px;
+      display:none;
+      z-index:90;
+    }
+
+    /* Camera */
+    #cameraWrap{display:none;margin-top:10px}
+    #cameraWrap video{
+      display:block;
+      width:100%;
+      max-height:260px;
+      border:1px solid var(--border);
+      border-radius:10px;
+    }
+
+    /* ===== MOBIEL ===== */
+    @media (max-width: 640px){
+      body { background: var(--panel); }
+      .wrap { padding: 6px; }
+      .scanbar { flex-direction: column; align-items: stretch; gap: 6px; }
+      .pill { font-size: 18px; padding: 12px 14px; width: 100%; }
+      .btn-scan, .btn-cam { width: 100%; padding: 12px 14px; font-size: 16px; border-radius: 10px; }
+      #cartTbl, #cartTbl thead, #cartTbl tbody, #cartTbl th, #cartTbl td, #cartTbl tr { display:block !important; }
+      #cartTbl thead { display:none !important; }
+      #cartTbl tbody tr {
+        background:#fff;
+        border:1px solid var(--border);
+        border-radius:12px;
+        margin:8px 0;
+        padding:10px 12px 8px;
+        position:relative;
+        box-shadow:0 2px 4px rgba(0,0,0,.05);
+      }
+      #cartTbl tbody tr td { border:none !important; padding:6px 0 !important; }
+      #cartTbl tbody tr td::before {
+        content:attr(data-label);
+        display:block;
+        font-size:11px;
+        color:var(--muted);
+        margin-bottom:2px;
+      }
+      #cartTbl input[type="number"] {
+        width:100% !important;
+        padding:10px;
+        font-size:17px;
+      }
+      #cartTbl .subtot { font-weight:600; font-size:18px; text-align:right; }
+      #cartTbl tbody tr td:last-child { position:absolute; right:8px; top:8px; }
+      #cartTbl tbody tr td:last-child .btn { padding:4px 10px; border-radius:8px; }
+      #cartTbl tfoot { display:none !important; }
+      .footer-inner { grid-template-columns:1fr !important; gap:8px; }
+      .total-big { font-size:26px; text-align:left; margin-top:6px; }
+      .cta .btn-primary { width:100%; font-size:20px; padding:16px; border-radius:12px; }
+      .muted { text-align:center; font-size:12px; }
+      #cameraWrap video { width:100%; max-height:40vh; border-radius:10px; }
+    }
+
+    /* Tabs */
+    .tabs {
+      display:flex;
+      gap:8px;
+      align-items:center;
+      margin-left:16px;
+    }
+    .tab-btn{
+      padding:8px 10px;
+      border:1px solid var(--border);
+      border-radius:8px;
+      background:#fff;
+      cursor:pointer;
+    }
+    .tab-btn.active{
+      border-color:var(--accent);
+      color:#fff;
+      background:var(--accent);
+    }
+
+    /* Views */
+    .view{display:none;}
+    .view.active{display:block;}
+
+    /* Bonnen-lijst */
+    .bonnen-toolbar{
+      display:flex;
+      gap:8px;
+      align-items:center;
+      margin:12px 0;
+    }
+    .bonnen-search{
+      flex:1;
+      padding:10px 12px;
+      border:1px solid var(--border);
+      border-radius:8px;
+    }
+    .bon-table{width:100%;border-collapse:collapse;}
+    .bon-table th,.bon-table td{
+      padding:10px;
+      border-bottom:1px solid var(--border);
+    }
+    .bon-table th{
+      background:var(--accent-light);
+      text-align:left;
+    }
+    .bon-actions{display:flex;gap:8px;}
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <div class="appbar">
+    <div style="display:flex; align-items:center; gap:12px;">
+      <div class="brand">
+        <img src="https://shop.golf-locker.nl/wp-content/uploads/2024/04/Golf-Locker-Logo-1-scaled.png" alt="Golf Locker" />
+        <h1>Golf Locker — POS</h1>
+      </div>
+      <div class="tabs">
+        <button class="tab-btn active" data-view="pos">Kassa</button>
+        <button class="tab-btn" data-view="retour">Retour</button>
+        <button class="tab-btn" data-view="bonnen">Bonnen</button>
+        <button class="tab-btn" data-view="sessie">Sessie</button>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn btn-ghost" onclick="refreshNow()">Vernieuw</button>
+      <button class="btn btn-danger" onclick="newCart()" title="Nieuwe verkoop (reset)">Nieuwe verkoop</button>
+    </div>
+  </div>
+
+  <!-- Kassa -->
+  <section id="view-pos" class="view active">
+    <div class="wrap">
+      <div class="panel">
+        <div class="scanbar">
+          <input id="scan" class="pill" placeholder="Scan of typ SKU" autofocus />
+          <button class="btn btn-scan" onclick="addScan()">Toevoegen</button>
+          <button class="btn btn-cam" onclick="toggleCamera()" id="camBtn">Camera</button>
+        </div>
+
+        <div id="cameraWrap"><video id="preview" playsinline></video></div>
+
+        <table id="cartTbl">
+          <thead>
+            <tr>
+              <th style="width:120px">SKU</th>
+              <th>Omschrijving</th>
+              <th class="right" style="width:140px">Prijs</th>
+              <th class="center" style="width:110px">Aantal</th>
+              <th class="right" style="width:140px">Subtotaal</th>
+              <th style="width:60px"></th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+          <tfoot>
+            <tr>
+              <td colspan="4" class="right muted">Totaal (sub)</td>
+              <td id="total" class="right">€ 0,00</td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+
+    <!-- Sticky footer -->
+    <div class="footer">
+      <div class="footer-inner">
+        <div class="footer-left">
+          <div class="total-big">Totaal: <span id="totalBig">€ 0,00</span></div>
+          <div class="item-count" id="itemCount">0 artikelen</div>
+        </div>
+        <div class="footer-right">
+          <label for="pay">Selecteer betaalwijze</label>
+          <select id="pay">
+            <option>PIN</option>
+            <option>Contant</option>
+            <option>Tikkie</option>
+            <option>Overig</option>
+          </select>
+          <input id="custEmail" class="email" placeholder="Klant e-mail (optioneel)">
+          <button onclick="book()" class="btn-primary">Boek & Print</button>
+          <div class="muted">Boekt alle regels als verkoop, print de bon en opent de PDF-bon.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Retour -->
+ <section id="view-retour" class="view">
+    <div class="wrap">
+      <div class="panel">
+        <h3>Retour</h3>
+
+        <div style="display:flex; gap:10px; margin-bottom:12px;">
+          <input id="retourBonInput" class="pill" placeholder="Voer bonnummer in (bijv. GL-20251028-002)">
+          <button class="btn btn-primary" onclick="searchReturnReceipt()">Zoek bon</button>
+        </div>
+
+        <div id="retourResult">
+          <div class="muted">Voer een bonnummer in om te beginnen.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Bonnen -->
+  <section id="view-bonnen" class="view">
+    <div class="wrap">
+      <div class="panel">
+        <div class="bonnen-toolbar">
+          <input id="bonSearch" class="bonnen-search" placeholder="Zoek op bonnummer of e-mail...">
+          <button class="btn" onclick="loadReceipts()">Zoek</button>
+        </div>
+        <table class="bon-table">
+          <thead>
+            <tr>
+              <th>Bon</th>
+              <th>Datum</th>
+              <th>Betaalwijze</th>
+              <th class="right">Totaal</th>
+              <th>E-mail</th>
+              <th>Acties</th>
+            </tr>
+          </thead>
+          <tbody id="bonList">
+            <tr><td colspan="6" class="muted">Laden…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- Sessie -->
+  <section id="view-sessie" class="view">
+    <div class="wrap">
+      <div class="panel">
+        <h3>Sessie</h3>
+        <div class="muted">Binnenkort: kas openen/sluiten, X/Z-rapport, contant mutaties.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Helpers -->
+  <div id="spinner"><div>Bezig…</div></div>
+  <div id="toast"></div>
+
+  <script>
+    // Kleinere global error-log (niet blokkeren)
+    (function(){
+      window.addEventListener('error', function(e){
+        console.log('GLOBAL ERROR', {
+          message:e.message,
+          file:e.filename,
+          line:e.lineno,
+          col:e.colno
+        });
+      });
+    })();
+
+    // Branding (client) t.b.v. 80mm herprint
+    const BRAND = {
+      name: 'Golf Locker',
+      line1: 'Dorpstraat 38',
+      line2: '3981 EB, Bunnik',
+      phone: '06-00000000',
+      email: 'info@golflocker.nl',
+      vat: 'NL861782495B01',
+      kvk: '80742300',
+      extra: 'Marge-regeling — btw inbegrepen',
+      logoUrl: 'https://shop.golf-locker.nl/wp-content/uploads/2024/04/Golf-Locker-Logo-1-scaled.png',
+      webshopUrl: 'https://shop.golf-locker.nl'
+    };
+
+    // ===== KASSA LOGICA =====
+    window.onerror = function(msg){
+      showSpinner(false);
+      alert('JS-fout: ' + msg);
+    };
+
+    const scan         = document.getElementById('scan');
+    const tb           = document.querySelector('#cartTbl tbody');
+    const totalEl      = document.getElementById('total');
+    const totalBigEl   = document.getElementById('totalBig');
+    const itemCountEl  = document.getElementById('itemCount');
+    const spinner      = document.getElementById('spinner');
+    const toast        = document.getElementById('toast');
+
+    const state = new Map();
+
+    function euro(n){
+      return new Intl.NumberFormat('nl-NL',{
+        style:'currency',
+        currency:'EUR'
+      }).format(n || 0);
+    }
+    function showSpinner(on){
+      if (!spinner) return;
+      spinner.style.display = on ? 'flex' : 'none';
+    }
+    function debounce(fn, ms){
+      let t;
+      return (...a)=>{
+        clearTimeout(t);
+        t = setTimeout(()=>fn(...a), ms);
+      };
+    }
+    function showToast(msg){
+      if (!toast) return;
+      toast.textContent = msg;
+      toast.style.display = 'block';
+      setTimeout(()=>{ toast.style.display='none'; },1500);
+    }
+
+    function updateTotals(total){
+      if (totalEl) totalEl.textContent     = euro(total);
+      if (totalBigEl) totalBigEl.textContent = euro(total);
+      const count = [...state.values()].reduce((s,i)=> s + (Number(i.qty)||1), 0);
+      if (itemCountEl) {
+        itemCountEl.textContent = `${count} artikel${count!==1?'en':''}`;
+      }
+    }
+    function updateTotalLocal(){
+      let t = 0;
+      state.forEach(it => {
+        t += (Number(it.price)||0) * (Number(it.qty)||1);
+      });
+      updateTotals(t);
+    }
+
+    function runWithTimeout(callFn, msg){
+      msg = msg || 'Server reageert niet (timeout).';
+      showSpinner(true);
+      let done = false;
+      const killer = setTimeout(()=>{
+        if (!done){
+          showSpinner(false);
+          alert(msg);
+        }
+      },10000);
+      callFn(
+        ()=>{ done=true; clearTimeout(killer); showSpinner(false); },
+        (err)=>{
+          done=true; clearTimeout(killer); showSpinner(false);
+          alert((err && err.message) || String(err));
+        }
+      );
+    }
+
+    function ensureRow(it){
+      let tr = tb.querySelector(`tr[data-sku="${it.sku}"]`);
+      if (!tr){
+        tr = document.createElement('tr');
+        tr.setAttribute('data-sku', it.sku);
+        tr.innerHTML = `
+          <td data-label="SKU">${it.sku}</td>
+          <td data-label="Omschrijving" class="desc"></td>
+          <td data-label="Prijs" class="right">
+            <input type="number" step="0.01" value="${it.price||0}">
+          </td>
+          <td data-label="Aantal" class="center">
+            <input type="number" min="1" value="${it.qty||1}">
+          </td>
+          <td data-label="Subtotaal" class="right subtot">€ 0,00</td>
+          <td><button class="btn btn-danger">✕</button></td>
+        `;
+
+        const priceInput = tr.querySelector('input[step]');
+        const qtyInput   = tr.querySelector('input[min]');
+        const rmBtn      = tr.querySelector('.btn-danger');
+
+        priceInput.addEventListener('input', debounce(e=>{
+          const v = e.target.value;
+          const it2 = state.get(it.sku);
+          if (!it2) return;
+          it2.price = Number(v);
+          updateRow(it.sku);
+          google.script.run
+            .withSuccessHandler(({total,line})=>{
+              updateTotals(total);
+              if (line){
+                state.set(line.sku, line);
+                updateRow(line.sku);
+              }
+            })
+            .withFailureHandler(err=>alert(err.message||err))
+            .apiSetPriceFast(it.sku, v);
+        },250));
+
+        qtyInput.addEventListener('input', debounce(e=>{
+          const v = e.target.value;
+          const it2 = state.get(it.sku);
+          if (!it2) return;
+          it2.qty = Math.max(1, Number(v)||1);
+          updateRow(it.sku);
+          google.script.run
+            .withSuccessHandler(({total,line})=>{
+              updateTotals(total);
+              if (line){
+                state.set(line.sku, line);
+                updateRow(line.sku);
+              }
+            })
+            .withFailureHandler(err=>alert(err.message||err))
+            .apiSetQtyFast(it.sku, v);
+        },250));
+
+        rmBtn.addEventListener('click', ()=>{
+          tb.removeChild(tr);
+          state.delete(it.sku);
+          updateTotalLocal();
+          google.script.run
+            .withSuccessHandler(({total})=>updateTotals(total))
+            .withFailureHandler(err=>alert(err.message||err))
+            .apiRemoveFast(it.sku);
+        });
+
+        tb.appendChild(tr);
+      }
+      state.set(it.sku, it);
+      updateRow(it.sku);
+    }
+
+    function updateRow(sku){
+      const it = state.get(sku);
+      const tr = tb.querySelector(`tr[data-sku="${sku}"]`);
+      if (!tr || !it) return;
+      tr.querySelector('.desc').textContent = it.desc || '';
+      tr.querySelector('input[step]').value = it.price || 0;
+      tr.querySelector('input[min]').value  = it.qty || 1;
+      tr.querySelector('.subtot').textContent = euro((it.price||0)*(it.qty||1));
+      updateTotalLocal();
+    }
+
+    function addScan(){
+      const sku = (scan.value || '').trim();
+      if (!sku) return;
+      if (state.has(sku)){
+        const it = state.get(sku);
+        it.qty += 1;
+        ensureRow(it);
+      }
+      google.script.run
+        .withSuccessHandler(({line,total})=>{
+          ensureRow(line);
+          updateTotals(total);
+        })
+        .withFailureHandler(err=>{
+          alert(err.message||err);
+          if (state.has(sku)){
+            const it = state.get(sku);
+            it.qty = Math.max(1, it.qty - 1);
+            ensureRow(it);
+          }
+        })
+        .apiAddFast(sku);
+
+      scan.value = '';
+      scan.focus();
+    }
+
+    function newCart(){
+      runWithTimeout((ok,fail)=>{
+        google.script.run
+          .withSuccessHandler(()=>{
+            tb.innerHTML = '';
+            state.clear();
+            updateTotalLocal();
+            const em = document.getElementById('custEmail');
+            if (em) em.value = '';
+            ok();
+            scan.focus();
+          })
+          .withFailureHandler(fail)
+          .apiClearCart();
+      }, 'Kon nieuwe verkoop niet starten.');
+    }
+
+      function book(){
+      const btns = document.querySelectorAll('button');
+      btns.forEach(b => b.disabled = true);
+      showSpinner(true);
+
+      // 🔹 Belangrijk: vensters NU openen binnen de klik
+      // zodat Chrome ze ziet als user-gesture.
+      const ticketWin = window.open('', '_blank');
+      const pdfWin    = window.open('', '_blank');
+
+      const pay   = document.getElementById('pay').value;
+      const email = (document.getElementById('custEmail').value || '').trim();
+
+      google.script.run
+        .withSuccessHandler(({pdfUrl,total,receiptNo,ticketUrl}) => {
+
+          // 80mm ticket
+          if (ticketUrl) {
+            if (ticketWin && !ticketWin.closed) {
+              ticketWin.location.href = ticketUrl;
+            } else {
+              window.open(ticketUrl, '_blank');
+            }
+          } else if (ticketWin && !ticketWin.closed) {
+            // geen URL → venster weer sluiten
+            ticketWin.close();
+          }
+
+          // PDF bon
+          if (pdfUrl) {
+            if (pdfWin && !pdfWin.closed) {
+              pdfWin.location.href = pdfUrl;
+            } else {
+              window.open(pdfUrl, '_blank');
+            }
+          } else if (pdfWin && !pdfWin.closed) {
+            pdfWin.close();
+          }
+
+          alert(
+            'Totaal: ' + euro(total) +
+            '\nBon ' + receiptNo + ' is geopend/afgedrukt.'
+          );
+
+          const em = document.getElementById('custEmail');
+          if (em) em.value = '';
+
+          newCart();
+          showSpinner(false);
+          btns.forEach(b => b.disabled = false);
+        })
+        .withFailureHandler(err => {
+          showSpinner(false);
+          btns.forEach(b => b.disabled = false);
+
+          // Vensters netjes sluiten als er iets misgaat
+          if (ticketWin && !ticketWin.closed) ticketWin.close();
+          if (pdfWin && !pdfWin.closed) pdfWin.close();
+
+          alert(err && err.message ? err.message : String(err));
+        })
+        .apiBookAndReceipt(pay, email);
+    }
+    function refreshNow(){
+      google.script.run
+        .withSuccessHandler(({cart,total,changed})=>{
+          tb.innerHTML = '';
+          state.clear();
+          (cart || []).forEach(it => ensureRow(it));
+          updateTotals(total);
+          showToast(changed ? `Bijgewerkt (${changed})` : 'Up-to-date');
+        })
+        .withFailureHandler(err=>alert(err.message||err))
+        .apiRefreshFromSheet();
+
+      google.script.run.apiWarmIndex();
+    }
+
+    function load(){
+      runWithTimeout((ok,fail)=>{
+        google.script.run
+          .withSuccessHandler(cart=>{
+            tb.innerHTML = '';
+            state.clear();
+            let t = 0;
+            (cart || []).forEach(it=>{
+              ensureRow(it);
+              t += (Number(it.price)||0) * (Number(it.qty)||1);
+            });
+            updateTotals(t);
+            ok();
+            scan.focus();
+            google.script.run.apiWarmIndex();
+            setInterval(refreshNow, 60000);
+          })
+          .withFailureHandler(fail)
+          .apiGetCart();
+      }, 'Kon de kassa niet initialiseren.');
+    }
+
+    scan.addEventListener('keydown', e=>{
+      if (e.key === 'Enter') addScan();
+    });
+    load();
+
+    // ===== Camera =====
+    let codeReader = null;
+    let streamOn   = false;
+    let barcodeLoop = null;
+
+    async function toggleCamera(){
+      const wrap  = document.getElementById('cameraWrap');
+      const btn   = document.getElementById('camBtn');
+      const video = document.getElementById('preview');
+
+      if (streamOn){
+        stopCamera();
+        return;
+      }
+
+      try {
+        wrap.style.display = 'block';
+        video.style.display = 'block';
+        btn.textContent = 'Stop camera';
+
+        if (window.ZXing && ZXing.BrowserMultiFormatReader){
+          codeReader = new ZXing.BrowserMultiFormatReader();
+          await codeReader.decodeFromConstraints(
+            { video:{ facingMode:{ ideal:'environment' } } },
+            video,
+            (result)=>{
+              if (result){
+                scan.value = result.getText();
+                addScan();
+              }
+            }
+          );
+          streamOn = true;
+          return;
+        }
+
+        if ('BarcodeDetector' in window && navigator.mediaDevices && navigator.mediaDevices.getUserMedia){
+          const stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'environment' } });
+          video.srcObject = stream;
+          await video.play();
+          const detector = new BarcodeDetector({
+            formats:['qr_code','code_128','code_39','ean_13','ean_8']
+          });
+
+          barcodeLoop = async ()=>{
+            if (!streamOn) return;
+            try{
+              const codes = await detector.detect(video);
+              if (codes && codes.length){
+                scan.value = codes[0].rawValue;
+                addScan();
+              }
+            } catch(e){}
+            requestAnimationFrame(barcodeLoop);
+          };
+
+          streamOn = true;
+          barcodeLoop();
+          return;
+        }
+
+        throw new Error('Geen compatibele scantechnologie gevonden.');
+      } catch(e){
+        alert('Camera niet beschikbaar: ' + (e.message || e));
+        stopCamera();
+      }
+    }
+
+    function stopCamera(){
+      const wrap  = document.getElementById('cameraWrap');
+      const btn   = document.getElementById('camBtn');
+      const video = document.getElementById('preview');
+
+      try { if (codeReader) codeReader.reset(); } catch(e){}
+      const s = video.srcObject;
+      if (s){
+        try { s.getTracks().forEach(t=>t.stop()); } catch(e){}
+      }
+      video.srcObject = null;
+
+      wrap.style.display = 'none';
+      video.style.display = 'none';
+      btn.textContent = 'Camera';
+      streamOn = false;
+    }
+  </script>
+
+  <!-- Service Worker tijdelijk uit (debugvriendelijk) -->
+  <script>
+    // Laat deze voorlopig uit om HTTPS / SW issues te vermijden.
+    if (false && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.register('?file=sw', { scope: './' }).catch(()=>{});
+    }
+  </script>
+
+  <!-- Sticky footer spacer -->
+  <script>
+    (function stickyFooterSpace(){
+      const footer = document.querySelector('.footer');
+      if (!footer) return;
+      function applySpace(){
+        const h = footer.offsetHeight || 0;
+        document.documentElement.style.setProperty('--footer-h', h + 'px');
+      }
+      window.addEventListener('load', applySpace);
+      window.addEventListener('resize', applySpace);
+      if (window.ResizeObserver){
+        new ResizeObserver(applySpace).observe(footer);
+      } else {
+        setTimeout(applySpace, 100);
+      }
+    })();
+  </script>
+
+  <script>
+    (function () {
+
+      // Normaliseer bonnummer (zero-width characters verwijderen)
+      function normaliseReceiptNo(raw) {
+        return String(raw || '')
+          .replace(/[\u200B-\u200D\uFEFF]/g, '')
+          .trim();
+      }
+
+      // ===========================
+      // RENDER RETURN RESULT UI
+      // ===========================
+      function renderReturnResult(data) {
+        const box = document.getElementById('retourResult');
+        if (!box) return;
+
+        console.log('[RET] renderReturnResult RAW:', JSON.stringify(data));
+
+        // Bewaar alles globaal voor processReturn()
+        window.retourData = data;
+
+        if (!data || !data.head) {
+          box.innerHTML = `<div class="muted">Bon niet gevonden.</div>`;
+          return;
+        }
+
+        const h = data.head;
+        const lines = data.lines || [];
+
+        // Bouw UI
+        let html = `
+          <h4>Bon ${h.receipt_no}</h4>
+
+          <table class="bon-table">
+            <thead>
+              <tr>
+                <th>Retour?</th>
+                <th>SKU</th>
+                <th>Omschrijving</th>
+                <th>Prijs</th>
+                <th>Reden</th>
+              </tr>
+            </thead>
+            <tbody>
+        `;
+
+        lines.forEach((it, idx) => {
+          html += `
+            <tr>
+              <td>
+                <input type="checkbox"
+                      class="retour-check"
+                      data-idx="${idx}">
+              </td>
+              <td>${it.sku}</td>
+              <td>${it.desc}</td>
+              <td>€ ${Number(it.price).toFixed(2)}</td>
+              <td>
+                <select class="retour-reason" data-idx="${idx}">
+                  <option value="">- selecteer -</option>
+                  <option value="Niet goed">Niet goed</option>
+                  <option value="Verkeerde maat">Verkeerde maat</option>
+                  <option value="Beschadigd">Beschadigd</option>
+                  <option value="Niet naar wens">Niet naar wens</option>
+                  <option value="Overig">Overig</option>
+                </select>
+              </td>
+            </tr>
+          `;
+        });
+
+        html += `</tbody></table>`;
+
+        if (lines.length > 1) {
+          html += `
+            <div style="margin-top:12px;">
+              <label>
+                <input type="checkbox" id="applyAllReasons">
+                Zelfde reden toepassen op alle artikelen
+              </label>
+            </div>
+          `;
+        }
+
+        html += `
+          <button class="btn btn-primary"
+                  style="margin-top:18px;"
+                  onclick="processReturn('${h.receipt_no}')">
+            Retour verwerken
+          </button>
+        `;
+
+        box.innerHTML = html;
+      }
+
+      // ===========================
+      // ZOEKEN VAN BON
+      // ===========================
+      window.searchReturnReceipt = function () {
+        const inputEl = document.getElementById('retourBonInput');
+        const box     = document.getElementById('retourResult');
+        if (!inputEl || !box) return;
+
+        const raw = inputEl.value || '';
+        const no  = normaliseReceiptNo(raw);
+
+        console.log('[RET] UI cleaned:', JSON.stringify(no));
+
+        if (!no) {
+          box.innerHTML = '<div class="muted">Vul een bonnummer in.</div>';
+          return;
+        }
+
+        box.innerHTML = '<div class="muted">Laden…</div>';
+
+        if (!(window.google && google.script && google.script.run)) {
+          box.innerHTML = '<div class="muted">Technische fout (geen server verbinding).</div>';
+          return;
+        }
+
+        google.script.run
+          .withSuccessHandler(data => {
+            console.log('[RET] apiReturnGetSafe →', JSON.stringify(data));
+            try {
+              window.renderReturnResult(data);
+            } catch (err) {
+              console.error('[RET] renderReturnResult fout:', err);
+              box.innerHTML = '<div class="muted">Fout bij tonen van de retourbon.</div>';
+            }
+          })
+          .withFailureHandler(err => {
+            console.error('[RET] apiReturnGetSafe ERROR:', err);
+            box.innerHTML = `<div class="muted">Fout: ${(err && err.message) || err}</div>`;
+          })
+          .apiReturnGetSafe(no);
+      };
+
+      // ===========================
+      // RETOUR VERWERKING
+      // (UI → backend)
+      // ===========================
+      window.processReturn = function (receiptNo) {
+
+        if (!window.retourData || !window.retourData.lines) {
+          alert("Geen bon geladen.");
+          return;
+        }
+
+        const lines = window.retourData.lines;
+        const checks = document.querySelectorAll('.retour-check');
+        const applyAll = document.getElementById('applyAllReasons')?.checked || false;
+
+        const retourItems = [];
+
+        // Global reason bepalen
+        let globalReason = '';
+        if (applyAll) {
+          const firstReasonEl = document.querySelector('.retour-reason[data-idx="0"]');
+          if (firstReasonEl && firstReasonEl.value) {
+            globalReason = firstReasonEl.value;
+          } else {
+            alert("Selecteer eerst een reden via één van de regels.");
+            return;
+          }
+        }
+
+        checks.forEach(cb => {
+          if (cb.checked) {
+
+            const idx = cb.dataset.idx;
+
+            const reasonEl = document.querySelector(`.retour-reason[data-idx="${idx}"]`);
+            const reason = applyAll ? globalReason : (reasonEl?.value || '');
+
+            if (!reason) {
+              alert(`Selecteer een reden voor SKU ${lines[idx].sku}`);
+              return;
+            }
+
+            retourItems.push({
+              sku: String(lines[idx].sku || ''),
+              desc: String(lines[idx].desc || ''),
+              price: Number(lines[idx].price || 0),
+              reason: String(reason || '')
+            });
+
+          }
+        });
+
+        if (!retourItems.length) {
+          alert("Geen artikelen geselecteerd voor retour.");
+          return;
+        }
+
+        console.log('[RET] retourItems →', retourItems);
+        console.log("[DEBUG FRONTEND] payload die naar server gaat:", {
+          receiptNo,
+          items: retourItems
+        });
+
+        google.script.run
+          .withSuccessHandler(res => {
+            console.log('[RET] apiProcessReturn →', res);
+
+            if (res && res.ok) {
+              alert("Retour verwerkt!");
+
+              // reset UI
+              document.getElementById('retourResult').innerHTML =
+                '<div class="muted">Voer een bonnummer in om te beginnen.</div>';
+
+              if (res.returnHtmlUrl) {
+                window.open(res.returnHtmlUrl, '_blank');
+              }
+
+            } else {
+              alert("Fout bij verwerken retour.");
+            }
+          })
+          .withFailureHandler(err => {
+            console.error('[RET] apiProcessReturn ERROR:', err);
+            alert("Fout: " + ((err && err.message) || err));
+          })
+          .apiProcessReturn(receiptNo, { items: retourItems });
+      };
+
+      // Publiek maken
+      window.renderReturnResult = renderReturnResult;
+
+    })();
+
+  </script>
+
+
+
+  <!-- Tabs + Bonnen loader + hybride 80mm herprint -->
+  <script>
+    // Tabs
+    (function(){
+      const tabs = document.querySelectorAll('.tab-btn');
+
+      function show(view){
+        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        const btn = document.querySelector('.tab-btn[data-view="'+view+'"]');
+        const sec = document.getElementById('view-'+view);
+        if (btn) btn.classList.add('active');
+        if (sec) sec.classList.add('active');
+        if (view === 'bonnen') loadReceipts();
+      }
+
+      tabs.forEach(b => {
+        b.addEventListener('click', () => {
+          const v = b.dataset.view;
+          show(v);
+          location.hash = v;
+        });
+      });
+
+      // hash deep-link
+      if (location.hash){
+        const v = location.hash.slice(1);
+        if (document.getElementById('view-'+v)) show(v);
+      }
+
+      window.addEventListener('hashchange', () => {
+        const v = location.hash.slice(1);
+        if (document.getElementById('view-'+v)) show(v);
+      });
+
+      window.switchView = show;
+    })();
+
+    // Bonnen-lijst (hybride gedrag: PDF + 80mm)
+    function loadReceipts(){
+      const q = (document.getElementById('bonSearch').value || '').trim();
+      const list = document.getElementById('bonList');
+      list.innerHTML = '<tr><td colspan="6" class="muted">Laden…</td></tr>';
+
+      google.script.run
+        .withSuccessHandler(rows => {
+          console.log('apiListReceipts →', rows);
+
+          if (!rows || !Array.isArray(rows) || rows.length === 0) {
+            list.innerHTML = '<tr><td colspan="6" class="muted">Geen resultaten</td></tr>';
+            return;
+          }
+
+          const html = rows.map(r => {
+            const d = (r.date instanceof Date) ? r.date : new Date(r.date || '');
+            const dts = (d && !isNaN(d)) ? d.toLocaleString('nl-NL') : (r.date || '');
+            const tot = new Intl.NumberFormat('nl-NL',{style:'currency',currency:'EUR'}).format(Number(r.total)||0);
+            const pdf = String(r.pdfUrl || '').replace(/"/g,'&quot;');
+            const bon = String(r.bon80Url || '').replace(/"/g,'&quot;');
+
+            return `
+              <tr>
+                <td>${r.receipt_no || ''}</td>
+                <td>${dts}</td>
+                <td>${r.pay || ''}</td>
+                <td class="right">${tot}</td>
+                <td>${r.email || ''}</td>
+                <td class="bon-actions">
+                  ${pdf ? `<button class="btn" onclick="openPdf('${pdf}')">PDF</button>` : ''}
+                  ${bon ? `<button class="btn btn-primary" onclick="window.open('${bon}', '_blank')">Print 80mm</button>` : ''}
+                </td>
+              </tr>`;
+          }).join('');
+
+          list.innerHTML = html || '<tr><td colspan="6" class="muted">Geen bonnen gevonden</td></tr>';
+        })
+        .withFailureHandler(err => {
+          console.error('apiListReceipts FAILED:', err);
+          list.innerHTML = '<tr><td colspan="6" class="muted">Fout bij laden</td></tr>';
+        })
+        .apiListReceipts(200, q);
+    }
+
+    function openPdf(url){
+      if (!url){
+        alert('Geen PDF beschikbaar.');
+        return;
+      }
+      window.open(url, '_blank');
+    }
+
+    // Hybride: probeer live 80mm → anders val terug op PDF
+    async function reprint80(receiptNo, pdfUrlFallback){
+      try{
+        const data = await new Promise((ok, fail) => {
+          google.script.run
+            .withSuccessHandler(ok)
+            .withFailureHandler(fail)
+            .apiGetReceiptForPrint(receiptNo);
+        });
+
+        if (!data || !data.head || !data.items || !data.items.length){
+          throw new Error('Onvolledige bondata');
+        }
+
+        const head = data.head;
+        const d    = head.date ? new Date(head.date) : null;
+        const dateString = (d && !isNaN(d))
+          ? d.toLocaleString('nl-NL')
+          : (head.date || '');
+
+        const cart = (data.items || []).map(it => ({
+          sku: it.sku,
+          desc: it.desc,
+          price: it.price,
+          qty: it.qty,
+          subt: it.subtotal
+        }));
+
+        const html = buildReceipt80mmHtml({
+          receiptNo: head.receipt_no,
+          payMethod: head.pay,
+          customerEmail: head.email,
+          total: head.total,
+          dateString,
+          cart
+        });
+
+        const w = window.open('', '_blank', 'width=420,height=800');
+        if (!w || !w.document){
+          throw new Error('Pop-up geblokkeerd door browser');
+        }
+        w.document.open();
+        w.document.write(html);
+        w.document.close();
+      } catch(e){
+        console.error('reprint80 fout:', e);
+        if (pdfUrlFallback){
+          alert(
+            'Kon de 80mm-bon niet live genereren voor bon ' + receiptNo +
+            '.\nWe openen nu de PDF-bon.'
+          );
+          openPdf(pdfUrlFallback);
+        } else {
+          alert('Kon de 80mm-bon niet genereren voor bon ' + receiptNo + '.');
+        }
+      }
+    }
+  </script>
+
+  <!-- 80mm ticket HTML-builder (client) -->
+  <script>
+    function buildReceipt80mmHtml(opts){
+      const receiptNo     = opts.receiptNo || '';
+      const payMethod     = opts.payMethod || '-';
+      const customerEmail = opts.customerEmail || '';
+      const total         = Number(opts.total) || 0;
+      const dateString    = opts.dateString || '';
+      const cart          = opts.cart || [];
+
+      const enc = encodeURIComponent;
+      const fmt = (n)=> new Intl.NumberFormat('nl-NL',{
+        style:'currency',
+        currency:'EUR'
+      }).format(Number(n||0));
+
+      const qrUrl = 'https://quickchart.io/qr?text=' +
+        enc(BRAND.webshopUrl || '') +
+        '&size=180&margin=1&format=png';
+
+      const code128Url = 'https://bwipjs-api.metafloor.com/?bcid=code128&text=' +
+        enc(receiptNo || '') +
+        '&scale=3&height=12&includetext&textxalign=center';
+
+      // Belangrijk: </script> escapen in template
+      const autoPrintScript = `
+        <script>
+          window.addEventListener('load', function(){
+            setTimeout(function(){
+              try { window.print(); } catch(e){}
+              setTimeout(function(){
+                try { window.close(); } catch(e){}
+              }, 800);
+            }, 300);
+          });
+        <\\/script>`;
+
+      const rowsHtml = cart.map(it => {
+        const displaySku = (String(it.sku || '').slice(0,5)).padEnd(5,' ');
+        const subt = (it.subt != null)
+          ? Number(it.subt)
+          : (Number(it.price||0) * Number(it.qty||1));
+
+        return `
+          <tr>
+            <td class="sku mono">${displaySku}</td>
+            <td class="qty">${it.qty || 1}</td>
+            <td class="desc">${String(it.desc || '').replace(/</g,'&lt;')}</td>
+            <td class="price">${fmt(it.price)}</td>
+            <td class="subt mono">${fmt(subt)}</td>
+          </tr>`;
+      }).join('');
+
+      return `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Bon ${receiptNo}</title>
+  <style>
+    @page { size: 80mm auto; margin: 4mm 4mm; }
+    *{box-sizing:border-box}
+    body{
+      font:11px/1.25 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+      color:#000;
+    }
+    .ticket{width:72mm;max-width:72mm;margin:0 auto}
+    .center{text-align:center}
+    .right{text-align:right}
+    .muted{color:#555}
+    .logo{display:block;width:54mm;margin:0 auto 8px;filter:grayscale(100%)}
+    h1{font-size:14px;margin:0 0 6px;text-align:center}
+    .small{font-size:10px}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    .row{display:flex;justify-content:space-between}
+    hr{border:0;border-top:1px dashed #000;margin:6px 0}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:2px 0;vertical-align:top}
+    th{text-align:left;font-weight:700}
+    .sku{width:12mm;font-size:9px;white-space:pre}
+    .qty{width:7mm;text-align:left;padding-left:2px}
+    .desc{width:27mm;padding-right:2mm}
+    .price{width:11mm;text-align:right}
+    .subt{width:13mm;text-align:right}
+    .total{font-size:13px;font-weight:700}
+    .qr{width:36mm;margin:6px auto 0}
+    .barcode{width:60mm;margin:6px auto 0;display:block}
+    @media print{.noprint{display:none!important}}
+  </style>
+</head>
+<body>
+  <div class="ticket">
+    ${BRAND.logoUrl ? `<img class="logo" src="${BRAND.logoUrl}" alt="logo">` : ''}
+    <h1>${BRAND.name || ''}</h1>
+    <div class="center small muted">${BRAND.line1 || ''} • ${BRAND.line2 || ''}</div>
+    <div class="center small muted">${BRAND.phone || ''} • ${BRAND.email || ''}</div>
+    <div class="center small muted">BTW: ${BRAND.vat || '-'} • KvK: ${BRAND.kvk || '-'}</div>
+
+    <hr>
+    <div class="row small">
+      <div>Betaalwijze: ${payMethod}</div>
+      <div class="right">${dateString}</div>
+    </div>
+    ${customerEmail ? `<div class="small">Klant: ${customerEmail}</div>` : ''}
+
+    <hr>
+    <table>
+      <thead>
+        <tr>
+          <th class="sku">SKU</th>
+          <th class="qty">Aant.</th>
+          <th class="desc">Artikel</th>
+          <th class="price">Prijs</th>
+          <th class="subt">Subt.</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rowsHtml}
+      </tbody>
+    </table>
+
+    <hr>
+    <table>
+      <tr>
+        <td class="right total" colspan="5">Totaal: ${fmt(total)}</td>
+      </tr>
+    </table>
+
+    ${BRAND.extra ? `<div class="small muted" style="margin-top:6px">${BRAND.extra}</div>` : ''}
+
+    <div class="center">
+      <img class="qr" src="${qrUrl}" alt="qr">
+    </div>
+    <div class="center small muted" style="margin-top:4px">
+      ${BRAND.webshopUrl || ''}
+    </div>
+
+    <img class="barcode" src="${code128Url}" alt="Bon ${receiptNo}">
+    <div class="center small muted" style="margin-top:6px">
+      Bedankt voor uw aankoop!
+    </div>
+    <div class="noprint center" style="margin-top:8px">
+      <button onclick="window.print()">Print</button>
+    </div>
+  </div>
+
+  ${autoPrintScript}
+
+</body>
+</html>`;
+    }
+  </script>
+</body>
+</html>
